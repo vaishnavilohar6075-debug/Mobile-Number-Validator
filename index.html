@@ -174,7 +174,14 @@
               <h2 class="section-heading">DFA State Diagram</h2>
               <p class="section-subtext">Interactive automata graph: q0 (start), q1–q9, q10 (accept), qD (dead)</p>
             </div>
-            <button id="reset-zoom-btn" class="pill-btn pill-btn-xs pill-btn-dark">Reset View</button>
+            <div class="dfa-view-actions">
+              <button id="toggle-fit-btn" class="pill-btn pill-btn-xs pill-btn-primary" title="Toggle between Fit-to-Screen and Pan View">Fit to Screen</button>
+              <button id="reset-zoom-btn" class="pill-btn pill-btn-xs pill-btn-dark" title="Scroll to start state q0">Start (q0)</button>
+            </div>
+          </div>
+
+          <div class="mobile-scroll-hint mobile-only">
+            <span>👉 Swipe horizontally to inspect states q0 → q10 &amp; qD</span>
           </div>
 
           <div class="dfa-svg-outer" id="dfa-svg-wrapper">
@@ -217,7 +224,7 @@
 
                 <!-- Row 1: q0 -> q1 -> q2 -> q3 -> q4 -> q5 -->
                 <path id="trans-q0-q1" class="transition-arrow" d="M 108 90 L 197 90" marker-end="url(#arrow)" />
-                <text x="152" y="78" class="trans-label">6,7,8,9</text>
+                <text x="152" y="78" class="trans-label">(6/7/8/9)</text>
 
                 <path id="trans-q1-q2" class="transition-arrow" d="M 253 90 L 342 90" marker-end="url(#arrow)" />
                 <text x="297" y="78" class="trans-label">0–9</text>
@@ -259,7 +266,7 @@
 
                 <!-- Generalized non-digit transition to qD -->
                 <path id="trans-fail-generic" class="transition-arrow dead-trans dashed-trans" d="M 515 248 L 500 312" marker-end="url(#arrow)" />
-                <text x="548" y="285" class="trans-label fail-label">non-digit</text>
+                <text x="548" y="285" class="trans-label fail-label">⊥ (non-digit)</text>
 
                 <!-- Self Loop on Dead State qD -->
                 <path id="trans-qd-loop" class="transition-arrow self-loop" d="M 520 358 C 565 385 565 315 528 335" marker-end="url(#arrow)" />
@@ -377,7 +384,7 @@
                 <ul id="inspector-rules-list">
                   <li>δ(q0, [6,7,8,9]) → q1</li>
                   <li>δ(q0, [0..5]) → qD</li>
-                  <li>δ(q0, other) → qD</li>
+                  <li>δ(q0, ⊥) → qD</li>
                 </ul>
               </div>
             </div>
@@ -479,7 +486,7 @@
                 <tr>
                   <th>6, 7, 8, 9</th>
                   <th>0, 1, 2, 3, 4, 5</th>
-                  <th>Non-digit / Extra (&gt;10)</th>
+                  <th>⊥ (non-digit) / Extra (&gt;10)</th>
                 </tr>
               </thead>
               <tbody>
@@ -595,7 +602,7 @@
               <span class="tuple-badge">Σ</span>
               <div class="tuple-text-wrap">
                 <strong>Alphabet:</strong>
-                <code>Σ = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }</code>
+                <code>Σ = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 } ∪ { ⊥ }</code> (⊥ = any non-digit symbol)
               </div>
             </div>
 
@@ -603,7 +610,7 @@
               <span class="tuple-badge">δ</span>
               <div class="tuple-text-wrap">
                 <strong>Transition Function:</strong>
-                <code>δ : Q × Σ → Q</code> (Deterministic transition mapping)
+                <code>δ : Q × Σ → Q</code> (Total function; δ(q, ⊥) = qD for every q ∈ Q)
               </div>
             </div>
 
