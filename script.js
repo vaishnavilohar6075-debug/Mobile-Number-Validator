@@ -84,7 +84,7 @@
           return {
             nextState: 'qD',
             isValid: false,
-            reason: `Character '${symbol}' is not a valid decimal digit in Σ = {0-9}.`,
+            reason: `Character '${symbol}' is a non-digit symbol (⊥) and not a decimal digit; Σ = {0-9} ∪ {⊥}.`,
             colType: 'other'
           };
         }
