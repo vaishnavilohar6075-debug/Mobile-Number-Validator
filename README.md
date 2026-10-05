@@ -30,15 +30,16 @@ $$L = \{ w \in \{0,1,2,3,4,5,6,7,8,9\}^{10} \mid w[0] \in \{6,7,8,9\} \}$$
    - $qD$: Dead / Trap state for syntax or length violations.
 
 2. **$\Sigma$ (Alphabet)**:
-   $$\Sigma = \{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 \}$$
+   $$\Sigma = \{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 \} \cup \{ \bot \}$$
+   - $\bot$ represents any non-digit symbol (letters, spaces, special characters), so $\delta$ is a total function.
 
 3. **$\delta$ (Transition Function)**:
    - $\delta(q_0, a) = q_1$ for $a \in \{6, 7, 8, 9\}$
-   - $\delta(q_0, a) = qD$ for $a \in \{0, 1, 2, 3, 4, 5\}$ or $a \notin \Sigma$
+   - $\delta(q_0, a) = qD$ for $a \in \{0, 1, 2, 3, 4, 5, \bot\}$
    - $\delta(q_i, a) = q_{i+1}$ for $i \in \{1, 2, \dots, 9\}$ and $a \in \Sigma$
-   - $\delta(q_i, a) = qD$ for $i \in \{1, 2, \dots, 9\}$ and $a \notin \Sigma$
-   - $\delta(q_{10}, a) = qD$ for any $a$ (extra digits exceed length 10)
-   - $\delta(qD, a) = qD$ for any $a$ (trap loop)
+   - $\delta(q_i, a) = qD$ for $i \in \{1, 2, \dots, 9\}$ and $a = \bot$
+   - $\delta(q_{10}, a) = qD$ for any $a \in \Sigma$ (extra symbols exceed length 10)
+   - $\delta(qD, a) = qD$ for any $a \in \Sigma$ (trap loop)
 
 4. **$q_0$ (Start State)**:
    $$q_0 \in Q$$
