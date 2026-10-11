@@ -5,7 +5,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css"></head><body><div class="wrap">
 <h1>Mobile Number Validator</h1>
-
+ 
 <div class="pn">
   <div class="fields-grid">
     <div class="field-item">
@@ -34,12 +34,12 @@
       <span class="field-hint">DD/MM/YYYY</span>
     </div>
   </div>
-
+ 
   <div class="combined-preview">
     <span class="preview-lbl">Combined DFA Stream:</span>
     <code id="comb-str"></code>
   </div>
-
+ 
   <div class="row">
     <button id="run">Run</button>
     <button id="pause">Pause</button>
@@ -48,7 +48,7 @@
     <label class="spd">Speed <input type="range" id="spd" min="1" max="10" value="4"><b id="spv"></b></label>
   </div>
 </div>
-
+ 
 <div class="main">
   <div class="pn">
     <div class="row" style="justify-content:space-between">
@@ -67,12 +67,25 @@
     <div class="xp" id="xp"></div>
   </div>
 </div>
-
+ 
 <div class="pn">
   <h3>DFA State Space &amp; Transition Explorer</h3>
   <div class="dia"><svg id="svg" viewBox="0 0 1200 760" role="img" aria-label="Single DFA diagram"></svg></div>
 </div>
-
+ 
+<div class="pn" id="mxs">
+  <h3>Individual DFA Transition Matrices</h3>
+  <div class="hint">One matrix per field, using the same state names as the diagram above. Each one is the standalone DFA of its lane; the <code>|</code> field separator belongs only to the combined DFA, so inside a matrix it counts as <b>Other</b>. While a simulation runs, the active row, the last transition taken and its target cell are highlighted.</div>
+  <div class="mx-legend">
+    <span><b class="mx-key">→</b> initial state</span>
+    <span><b class="mx-key">*</b> accepting state</span>
+    <span><b class="mx-key ok">qN</b> valid transition</span>
+    <span><b class="mx-key acc">qN</b> move into accepting state</span>
+    <span><b class="mx-key bad">qd</b> invalid input, dead state</span>
+  </div>
+  <div id="mx-list"></div>
+</div>
+ 
 <div class="g4" id="info"></div>
 </div>
 <script src="script.js"></script></body></html>
