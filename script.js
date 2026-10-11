@@ -161,13 +161,15 @@ function runDFA(str,startState=0){
 }
 
 // Calendar correctness validation (combined with DFA format validation)
-function cal(v){
+// The DFA only checks the character pattern DD/MM/YYYY; this algorithm checks that the date actually exists.
+const DOB_MIN_YEAR=1900,DOB_MAX_YEAR=2099;
+function cal(v,today=new Date()){
  if(!v)return'Date is empty';
  const parts=v.split('/');
  if(parts.length!==3)return'Format must be DD/MM/YYYY';
  const[dd,mm,y]=parts.map(Number);
  if(isNaN(dd)||isNaN(mm)||isNaN(y))return'Invalid numeric date components';
- if(y<1900||y>2099)return`Year ${y} must be between 1900 and 2099`;
+ if(y<DOB_MIN_YEAR||y>DOB_MAX_YEAR)return`Year ${y} must be between ${DOB_MIN_YEAR} and ${DOB_MAX_YEAR}`;
  if(mm<1||mm>12)return`Month ${mm} does not exist (must be 01-12)`;
  const lp=(y%4===0&&y%100!==0)||(y%400===0);
  const dm=[31,lp?29:28,31,30,31,30,31,31,30,31,30,31];
@@ -175,6 +177,8 @@ function cal(v){
   if(mm===2)return`Day ${dd} invalid: February in ${y} ${lp?'is a leap year (max 29)':'is not a leap year (max 28)'}`;
   return`Day ${dd} does not exist in month ${mm} (max ${dm[mm-1]} days)`;
  }
+ const t0=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+ if(new Date(y,mm-1,dd)>t0)return'Date of birth cannot be in the future';
  return null;
 }
 
@@ -239,6 +243,101 @@ function evaluateField(g,val){
   return{ok:true,msg:'Valid date of birth'};
  }
  return{ok:false,msg:'Unknown field'};
+}
+
+// ===== Individual DFA transition matrices =====
+// Every table is generated from the same transition list E (through stepDFA) that draws the
+// diagram and drives the simulation, so matrix, diagram and implementation cannot drift apart.
+// Each matrix is the standalone DFA of one lane. The '|' separator exists only in the combined
+// DFA, so inside a matrix it is simply part of the "Other" column.
+const cat=(label,sub,test,rep)=>({label,sub,test,rep});
+const OTHER=cat('Other','anything else',()=>true,'#');
+const LANES=[
+ {g:0,title:'Name DFA',start:0,acc:[1],
+  cats:[cat('Letter','A–Z, a–z',L,'a'),cat('Space','single space',eq(' '),' '),OTHER],
+  notes:['q1 (accepting) means the name ends on a letter. A space is legal only between two letters (q1 → q2 → q1), so leading, trailing and double spaces go to qd.',
+         'Letters are ASCII A–Z / a–z exactly as in the code; digits, punctuation, accented letters and <code>|</code> all count as Other. An empty name never leaves q0 and is rejected.']},
+ {g:1,title:'Mobile Number DFA',start:3,acc:[13],
+  cats:[cat('Digit 6–9','',c=>/[6-9]/.test(c),'6'),cat('Digit 0–5','',c=>/[0-5]/.test(c),'0'),OTHER],
+  notes:['q3 accepts only 6–9 as the first digit. q4 … q12 accept any digit, and q13 (accepting) is reached after exactly 10 digits.',
+         'A leading 0–5, any non-digit, or an 11th character sends the machine to qd. Stopping early leaves it in a non-accepting state, so fewer than 10 digits is rejected.']},
+ {g:2,title:'Email DFA',start:14,acc:[22],
+  cats:[cat('Letter','A–Z, a–z',L,'a'),cat('Digit','0–9',D,'0'),cat('Hyphen','-',eq('-'),'-'),cat('Underscore','_',eq('_'),'_'),cat('Dot','.',eq('.'),'.'),cat('At','@',eq('@'),'@'),OTHER],
+  notes:['Local part: q14 – q16 (letters, digits, <code>_</code>, <code>-</code>, and single dots between characters). <code>@</code> moves q15 → q17. Domain: q18 – q21 (letters, digits, hyphens; underscore is not allowed).',
+         'q22, the only accepting state, means the text after the last dot is a run of at least 2 letters (a valid TLD). A dot cannot start, end or double up in the local part, and a domain label cannot start or end with a hyphen.']},
+ {g:3,title:'PIN Code DFA',start:23,acc:[29],
+  cats:[cat('Digit 1–9','',c=>/[1-9]/.test(c),'1'),cat('Digit 0','',eq('0'),'0'),OTHER],
+  notes:['q23 accepts only 1–9 (no leading zero). q24 … q28 accept any digit, and q29 (accepting) is reached after exactly 6 digits.',
+         'Letters, symbols, a leading 0, or a 7th character go to qd; fewer than 6 digits stops in a non-accepting state.']},
+ {g:4,title:'Date of Birth DFA',start:30,acc:[ACC],
+  cats:[cat('Digit 0–9','',D,'0'),cat('Slash','/',eq('/'),'/'),OTHER],
+  notes:['This DFA checks only the <b>character pattern</b> DD/MM/YYYY: two digits, <code>/</code>, two digits, <code>/</code>, four digits. Reaching q'+ACC+' means the text has the right shape, not that the date exists.',
+         'After the DFA accepts, the <b>calendar-validation algorithm</b> decides whether the date exists: month 01–12; day within that month\'s length (28/29/30/31); leap year if divisible by 400, or by 4 but not by 100; year between '+DOB_MIN_YEAR+' and '+DOB_MAX_YEAR+'; and not later than today.',
+         'Example: <code>32/13/7663</code> and <code>29/02/2023</code> both match the pattern, so the DFA accepts them, but the calendar check rejects them.']}
+];
+const catIndex=(ln,c)=>ln.cats.findIndex(k=>k.test(c));
+function laneModel(ln){
+ const ids=st.map((s,k)=>s.g===ln.g?k:-1).filter(k=>k>=0);
+ const rows=[...ids,'d'];
+ const next=rows.map(r=>ln.cats.map(k=>r==='d'?'d':stepDFA(r,k.rep).next));
+ return{ids,rows,next};
+}
+function buildMatrices(){
+ $('mx-list').innerHTML=LANES.map(ln=>{
+  const m=laneModel(ln),col=GR[ln.g][1],isAcc=r=>ln.acc.includes(r);
+  const head=`<th scope="col">State (q)</th>`+ln.cats.map(k=>`<th scope="col">${k.label.replace(/</g,'&lt;')}${k.sub?`<small>${k.sub.replace(/</g,'&lt;')}</small>`:''}</th>`).join('');
+  const body=m.rows.map((r,ri)=>{
+   const init=r===ln.start,acc=isAcc(r),dead=r==='d';
+   const mark=(init?'→':'')+(acc?'*':'');
+   const title=dead?'dead state':[init?'initial state':'',acc?'accepting state':''].filter(Boolean).join(', ');
+   const th=`<th scope="row" class="${dead?'dead':acc?'acc':''}"${title?` title="${title}"`:''}><span class="mk">${mark}</span>${q(r)}</th>`;
+   const tds=m.next[ri].map((n,ci)=>`<td class="${n==='d'?'bad':isAcc(n)?'acc':'ok'}" data-r="${r}" data-c="${ci}">${q(n)}</td>`).join('');
+   return`<tr data-r="${r}"${dead?' class="dead"':''}>${th}${tds}</tr>`;
+  }).join('');
+  const qs=m.ids.length>4?`{q${m.ids[0]}, …, q${m.ids.at(-1)}, qd}`:`{${m.ids.map(q).join(', ')}, qd}`;
+  const meta=`M = (Q, Σ, δ, q${ln.start}, F) &nbsp;·&nbsp; Q = ${qs} (${m.rows.length} states) &nbsp;·&nbsp; Σ = {${ln.cats.map(k=>k.label.replace(/</g,'&lt;')).join(', ')}} &nbsp;·&nbsp; q₀ = q${ln.start} &nbsp;·&nbsp; F = {${ln.acc.map(q).join(', ')}}`;
+  return`<article class="mx" id="mx${ln.g}" style="--c:${col}">
+   <div class="mx-hd"><b>${ln.title}</b><span class="mx-rng">q${m.ids[0]} to q${m.ids.at(-1)} + qd</span></div>
+   <details open><summary>View Transition Matrix</summary>
+    <div class="mx-card">
+     <div class="mx-title">Transition Matrix Δ(Q, Σ)</div>
+     <div class="mx-scroll" tabindex="0" role="region" aria-label="${ln.title} transition matrix"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
+     <div class="mx-meta">${meta}</div>
+     <div class="mx-last" id="mxl${ln.g}"></div>
+    </div>
+    <ul class="mx-note">${ln.notes.map(n=>`<li>${n}</li>`).join('')}</ul>
+   </details>
+  </article>`;
+ }).join('');
+}
+buildMatrices();
+
+// Highlights the active row, the last transition taken and its target cell in the matching matrix.
+// It is redrawn from S.i on every update(), so Run, Step and Pause keep the right highlight and Reset clears it.
+function updateMatrices(path,rec,cur){
+ document.querySelectorAll('#mx-list .hot,#mx-list .cur,#mx-list .on,#mx-list .badon').forEach(e=>e.classList.remove('hot','cur','on','badon'));
+ LANES.forEach(ln=>{const e=$('mxl'+ln.g);e.textContent='';e.className='mx-last';});
+ if(S.simState==='IDLE')return;
+ const lastLive=n=>path.slice(0,n+1).filter(x=>x!=='d').at(-1)??0;
+ const laneOf=(s,n)=>st[s==='d'?lastLive(n):s].g;
+ const cg=laneOf(cur,S.i),card=$('mx'+cg);
+ card.classList.add('on');if(cur==='d')card.classList.add('badon');
+ const row=card.querySelector(`tr[data-r="${cur}"]`);if(row)row.classList.add('cur');
+ if(S.i<1)return;
+ const n=S.i-1,prev=path[n],c=rec[n],next=path[n+1],g=laneOf(prev,n),ln=LANES[g],cap=$('mxl'+g);
+ if(c==='|'&&prev!=='d'&&next!=='d'){
+  cap.textContent=`'|' read in ${q(prev)}: the record moves on to ${q(next)} (${GR[st[next].g][0]} DFA). This hand-off exists only in the combined DFA.`;
+  return;
+ }
+ const td=document.querySelector(`#mx${g} td[data-r="${prev}"][data-c="${catIndex(ln,c)}"]`);
+ cap.textContent=`δ(${q(prev)}, '${c===' '?'␣':c}') = ${q(next)}${next==='d'?'  (invalid: dead state)':''}`;
+ if(next==='d')cap.classList.add('bad');
+ if(!td)return;
+ td.classList.add('hot');
+ if(!td.offsetParent)return; // section collapsed
+ const sc=td.closest('.mx-scroll'),a=td.getBoundingClientRect(),b=sc.getBoundingClientRect(),fw=sc.querySelector('th').offsetWidth;
+ if(a.left<b.left+fw)sc.scrollLeft-=(b.left+fw-a.left)+6;
+ else if(a.right>b.right)sc.scrollLeft+=a.right-b.right+6;
 }
 
 // UI State & Lifecycle
@@ -444,6 +543,9 @@ function update(){
   $('tok').style.transform=`translate(${sp.x}px,${sp.y-24}px)`;
   $('dl').setAttribute('d','M0,0L0,0');
  }
+
+ // 4. Individual DFA transition matrices
+ updateMatrices(path,fullRecord,curState);
 }
 
 // Tick step for timer
